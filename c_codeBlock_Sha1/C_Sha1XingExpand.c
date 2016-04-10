@@ -1,0 +1,275 @@
+/* 改进sha-1算法扩散性能的逐拍码字变动统计 */
+
+#include<stdio.h>
+#include <string.h>
+#include<math.h>
+#include<stdlib.h>
+// #define i_num 80        //迭代操作的次数
+#define r_num 1             //循环次数
+#define tr_i_num 512         //修改遍历
+char ran_input(unsigned char intput[64],int inputlength)
+{
+    int randi=0;
+    int randinput=(rand()%256)+1;
+    for(;randi<inputlength;randi++)
+    {
+        intput[randi]=randinput;
+    }
+}
+
+void creat_w(unsigned char input[64],unsigned long w[80])
+{
+   int i,j;
+   int wflag;unsigned long k11,k12,k21,k22;
+   unsigned long tempw1,tempw2,newtempw1,newtempw2,midnewtempw1,midnewtempw2;
+   unsigned long midtempw1,midtempw1_1,midtempw1_2;
+   unsigned long midtempw2,midtempw2_1,midtempw2_2;
+   for(i=0;i<80;i++)
+   {
+       wflag=i/40;   //分成2个部分，设置2类k的情况。
+       switch(wflag)
+        {
+            case 0: k11=0x428A,k12=0x7137,k21=0xB5c0,k22=0xE9B5;break;
+            case 1: k11=0x3956,k12=0x59F1,k21=0x923F,k22=0xAB1C;break;
+        }
+       if(i<16)   //i<16，w[i]实际上为4个char类型组成的long类型。所以input[64]全放入了w[15]以内
+       {
+           j=4*i;
+           w[i]=(((long)input[j])<<24 |((long)input[1+j])<<16|((long)input[2+j])<<8|((long)input[3+j])<<0)+0xBEF9A3F7;
+       }
+       else if(15<i<40)      //给w[16]~w[80]补值:先循环异或得出w[16]~w[80],再进行位的循环左移一位
+       {
+           tempw1=w[i-16]^w[i-14]^w[i-8]^w[i-3];
+           tempw2=w[i-1]^w[i-3]^w[i-7];
+
+            midtempw1=(((tempw1&0x0000ffff) ^k11) <<16 )|((tempw1&0xffff0000 )^(k12<<16 ));
+            midtempw1_1=midtempw1<<7;
+            midtempw1_2=midtempw1>>25;
+            newtempw1=midtempw1_1|midtempw1_2;
+
+            midtempw2=(((tempw1&0x0000ffff) ^k21) <<16 )|((tempw1&0xffff0000 )^(k22<<16 ));
+            midtempw2_1=midtempw2<<7;
+            midtempw2_2=midtempw2>>25;
+            newtempw2=midtempw2_1|midtempw2_2;
+
+            midnewtempw1=(newtempw1^newtempw2)<<3;
+            midnewtempw2=(newtempw1^newtempw2)>>29;
+            w[i]=midnewtempw1|midnewtempw2;
+
+         }
+         else      //给w[16]~w[80]补值:先循环异或得出w[16]~w[80],再进行位的循环左移一位
+         {
+             tempw1=w[i-16]^w[i-14]^w[i-8]^w[i-3];
+             tempw2=w[i-1]^w[i-3]^w[i-29];
+
+             midtempw1=(((tempw1&0x0000ffff) ^k11) <<16 )|((tempw1&0xffff0000 )^(k12<<16 ));
+             midtempw1_1=midtempw1<<7;
+             midtempw1_2=midtempw1>>25;
+             newtempw1=midtempw1_1|midtempw1_2;
+
+             midtempw2=(((tempw1&0x0000ffff) ^k21) <<16 )|((tempw1&0xffff0000 )^(k22<<16 ));
+             midtempw2_1=midtempw2<<7;
+             midtempw2_2=midtempw2>>25;
+             newtempw2=midtempw2_1|midtempw2_2;
+
+             midnewtempw1=(newtempw1^newtempw2)<<3;
+             midnewtempw2=(newtempw1^newtempw2)>>29;
+             w[i]=midnewtempw1|midnewtempw2;
+
+         }
+   }
+
+}
+void creat_errw(unsigned char input[64],unsigned long errw[80],int input_num,int input_bit)       //指定位置篡改
+{
+   int i,j,k;unsigned char inputtemp[64];
+   int wflag;unsigned long k11,k12,k21,k22;
+   unsigned long tempw1,tempw2,newtempw1,newtempw2,midnewtempw1,midnewtempw2;
+   unsigned long midtempw1,midtempw1_1,midtempw1_2;
+   unsigned long midtempw2,midtempw2_1,midtempw2_2;
+   int arri;
+
+   for(k=0;k<64;k++)
+   {
+       inputtemp[k]=input[k];
+   }
+   inputtemp[input_num]=inputtemp[input_num] ^ (1<<(input_bit-1));
+
+   for(i=0;i<80;i++)
+   {
+       wflag=i/40;   //分成2个部分，设置2类k的情况。
+       switch(wflag)
+        {
+            case 0: k11=0x428A,k12=0x7137,k21=0xB5c0,k22=0xE9B5;break;
+            case 1: k11=0x3956,k12=0x59F1,k21=0x923F,k22=0xAB1C;break;
+        }
+       if(i<16)   //i<16，w[i]实际上为4个char类型组成的long类型。所以input[64]全放入了w[15]以内
+       {
+           j=4*i;
+           errw[i]=(((long)inputtemp[j])<<24 |((long)inputtemp[1+j])<<16|((long)inputtemp[2+j])<<8|((long)inputtemp[3+j])<<0)+0xBEF9A3F7;
+       }
+       else if(15<i<40)      //给w[16]~w[80]补值:先循环异或得出w[16]~w[80],再进行位的循环左移一位
+       {
+           tempw1=errw[i-16]^errw[i-14]^errw[i-8]^errw[i-3];
+           tempw2=errw[i-1]^errw[i-3]^errw[i-7];
+
+            midtempw1=(((tempw1&0x0000ffff) ^k11) <<16 )|((tempw1&0xffff0000 )^(k12<<16 ));
+            midtempw1_1=midtempw1<<7;
+            midtempw1_2=midtempw1>>25;
+            newtempw1=midtempw1_1|midtempw1_2;
+
+            midtempw2=(((tempw1&0x0000ffff) ^k21) <<16 )|((tempw1&0xffff0000 )^(k22<<16 ));
+            midtempw2_1=midtempw2<<7;
+            midtempw2_2=midtempw2>>25;
+            newtempw2=midtempw2_1|midtempw2_2;
+
+            midnewtempw1=(newtempw1^newtempw2)<<3;
+            midnewtempw2=(newtempw1^newtempw2)>>29;
+            errw[i]=midnewtempw1|midnewtempw2;
+
+         }
+         else      //给w[16]~w[80]补值:先循环异或得出w[16]~w[80],再进行位的循环左移一位
+         {
+             tempw1=errw[i-16]^errw[i-14]^errw[i-8]^errw[i-3];
+             tempw2=errw[i-1]^errw[i-3]^errw[i-29];
+
+             midtempw1=(((tempw1&0x0000ffff) ^k11) <<16 )|((tempw1&0xffff0000 )^(k12<<16 ));
+             midtempw1_1=midtempw1<<7;
+             midtempw1_2=midtempw1>>25;
+             newtempw1=midtempw1_1|midtempw1_2;
+
+             midtempw2=(((tempw1&0x0000ffff) ^k21) <<16 )|((tempw1&0xffff0000 )^(k22<<16 ));
+             midtempw2_1=midtempw2<<7;
+             midtempw2_2=midtempw2>>25;
+             newtempw2=midtempw2_1|midtempw2_2;
+
+             midnewtempw1=(newtempw1^newtempw2)<<3;
+             midnewtempw2=(newtempw1^newtempw2)>>29;
+             errw[i]=midnewtempw1|midnewtempw2;
+
+         }
+   }
+
+}
+char ms_len(long a,char intput[64])     // input的60，61，62，63进行填充input[64]='\0';
+{
+    unsigned long temp3,p1;  int i,j;
+    temp3=0;            // 0x00000000
+    p1=~(~temp3<<8);    // 0x00000000-> 0xffffffff-> 0xffffff00-> 0x000000ff
+    for(i=0;i<4;i++)
+       {
+          j=8*i;
+          intput[63-i]=(char)((a&(p1<<j))>>j);  //假设input为iscbupt，a=56，转化成ascii，因为有char的限制 输入只能为0x7f以下
+
+       }
+
+}
+char input_init(char input[64],int n)     //用来初始化输入，对数组进行填充
+{
+   int i;long x;
+   if(n<57)           //n<57,先对60,61,62,63进行填充。n=56,56~59全赋值为0。n<56,input[n]=128,n+1后全赋值为0
+          {
+                 x=n*8;
+                 ms_len(x,input);
+                 if(n==56)
+                     for(i=n;i<60;i++)
+                     input[i]=0;
+                 else                 //在数据末位增加128，其他位赋0
+                    {
+                     input[n]=128;
+                     for(i=n+1;i<60;i++)
+                     input[i]=0;
+                    }
+
+          }
+}
+int bit_expand(unsigned long hashtrue[80],unsigned long hashfalse[80],int n,char expand[512][2560],int compute)            //求dc,返回dc矩阵
+{
+    int i,j;
+    for(i=0;i<80;i++)
+    {
+        unsigned long temp=0x000000001;
+        for(j=1;j<=32;j++)
+        {
+           if((hashtrue[i]&temp)!=(hashfalse[i]&temp))       //改变的个数+1
+            {
+                expand[n-1][i*32+j-1]=1;
+                compute++;
+            }else
+            {
+                expand[n-1][i*32+j-1]=0;
+            }
+            temp=temp<<1;
+        }
+    }
+    return compute;
+}
+
+main()
+{
+   unsigned long temp,temp1,temp2,temp3,k,f;int i,flag;unsigned long w[80],errw[80];
+   int input_len,char_len;int testi;unsigned char input[64];
+   int traverse_i,traverse_num,traverse_bit;
+   int repeat_num;int inputlength;
+
+   unsigned long changeT,changeTemp1,changeTemp2,changeTemp3,changeTemp;unsigned long ATemp,ATemp1,ATemp2,ATemp3;
+   unsigned long errchangeT,errchangeTemp1,errchangeTemp2,errchangeTemp3,errchangeTemp;
+   unsigned long errATemp,errATemp1,errATemp2,errATemp3;
+
+   int dc_i,dc_j,da_i,da_j;int daH4,daH3,daH2,daH1,daH0,da_total_sum;
+
+   unsigned long ARol,ARol7,ARol13,ARol19;unsigned long ARolTemp1,ARolTemp2;
+   unsigned long errARol,errARol7,errARol13,errARol19;unsigned long errARolTemp1,errARolTemp2;
+   int compute=0;
+
+   repeat_num=r_num;
+   srand(time(NULL));		//time是一个函数，获取时间保存结果于ts中
+   char sha1_expand[512][2560];
+   for(repeat_num;repeat_num>0;repeat_num--)
+    {
+        inputlength=rand()%57;
+        ran_input(input,inputlength);
+        //printf("input message:\n");
+        //scanf("%s",input);
+        input_len=strlen(input);   //n为输入明文总长度
+        char_len=sizeof(char)*8;
+        //printf("%d\n",char_len);
+        input_init(input,input_len);
+
+        creat_w(input,w);
+
+        // 指定位遍历改变
+        for(traverse_i=1;traverse_i<=tr_i_num ;traverse_i++)
+        {
+            da_total_sum=0;
+            traverse_num=(traverse_i-1)/8;
+            traverse_bit=(traverse_i-1)%8+1;
+            creat_errw(input,errw,traverse_num,traverse_bit);   //错误输出hash
+            compute=bit_expand(w,errw,traverse_i,sha1_expand,compute);
+
+            unsigned long errw[80]={0};
+            int showj=0;
+//            for(;showj<2560;showj++){
+//                printf("%d,",sha1_expand[traverse_i-1][showj]);
+//                //printf(":%d\t%d\t",traverse_i-1,showj);
+//            }
+            printf("???????? ");
+        }
+    }
+
+    printf("hello world!!!\n");
+    printf("%d",compute);
+    /*
+    int showi=0;int showj=0;
+    for(;showi<512;showi++){
+        for(;showj<2560;showj++){
+            printf("%d,",sha1_expand[showi][showj]);
+        }
+        printf("! ");
+    }
+    printf("Good night!!!\n");
+    */
+    getch();
+}
+
+
